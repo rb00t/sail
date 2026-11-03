@@ -128,7 +128,7 @@ fi
 rm -f "$CONF"
 OUT="$(run_ui "$CONF" q)"
 PLAIN="$(printf '%s\n' "$OUT" | strip)"
-WIDTHS="$(printf '%s\n' "$PLAIN" | grep -E '^  [│╭╰]' \
+WIDTHS="$(printf '%s\n' "$PLAIN" | grep -E '^  [│╭╰+|]' \
     | while IFS= read -r line; do
           printf '%s' "$line" | LC_ALL=en_US.UTF-8 wc -m | tr -d ' '
       done | sort -u)"
@@ -136,6 +136,39 @@ if [ "$(printf '%s\n' "$WIDTHS" | grep -c . || true)" -eq 1 ]; then
     ok "box borders and content share one width ($WIDTHS)"
 else
     fail "box line widths differ: $(printf '%s' "$WIDTHS" | tr '\n' ' ')"
+fi
+
+# --- 7. redraw keeps scrollback and marks unsaved changes ----------------
+rm -f "$CONF"
+OUT="$(run_ui "$CONF" q)"
+if printf '%s' "$OUT" | grep -q $'\033\[2J'; then
+    fail "sources UI clears the screen (scrollback lost)"
+else
+    ok "sources UI repaints without clearing scrollback"
+fi
+PLAIN="$(printf '%s\n' "$OUT" | strip)"
+if printf '%s\n' "$PLAIN" | grep -q 'unsaved'; then
+    fail "unsaved marker shown before any change"
+else
+    ok "no unsaved marker before a change"
+fi
+OUT="$(run_ui "$CONF" 1 q)"
+PLAIN="$(printf '%s\n' "$OUT" | strip)"
+if printf '%s\n' "$PLAIN" | grep -q 'unsaved'; then
+    ok "toggling marks the selection unsaved"
+else
+    fail "no unsaved marker after a toggle"
+fi
+
+# --- 8. ASCII mode draws an ASCII box ------------------------------------
+rm -f "$CONF"
+OUT="$(printf 'q\n' | SAIL_ASCII=1 SAIL_SOURCES="$CONF" bash bin/sail sources)"
+PLAIN="$(printf '%s\n' "$OUT" | strip)"
+if printf '%s\n' "$PLAIN" | grep -q '^  +-' \
+   && ! printf '%s\n' "$PLAIN" | grep -q '╭'; then
+    ok "SAIL_ASCII=1 draws an ASCII box"
+else
+    fail "SAIL_ASCII=1 still draws box-drawing characters"
 fi
 
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"

@@ -25,6 +25,17 @@ class HumanSizeTest(unittest.TestCase):
         self.assertEqual(search.human_size("not a number"), "?")
 
 
+class CleanTitleTest(unittest.TestCase):
+    def test_strips_control_sequences(self):
+        # a scraped title must never carry an escape the terminal would obey
+        self.assertEqual(search._clean_title("Dune\x1b[2J (2021)"),
+                         "Dune [2J (2021)")
+        self.assertEqual(search._clean_title("a\x07b"), "a b")
+
+    def test_collapses_whitespace(self):
+        self.assertEqual(search._clean_title("  Dune\n\t2021  "), "Dune 2021")
+
+
 class AgoTest(unittest.TestCase):
     def test_recent_is_just_now(self):
         self.assertEqual(search.ago(time.time()), "just now")

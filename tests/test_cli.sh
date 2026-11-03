@@ -196,5 +196,41 @@ else
     fail "wlist_file did not expand ~"
 fi
 
+# --- 7. the mode prompt offers `b`, takes one key, and sanitizes titles ----
+if grep -q "stream, download, or back? \[S/d/b/q\]" bin/sail \
+   && grep -q 'read -r -n 1 answer' bin/sail; then
+    ok "mode prompt takes one key and offers back"
+else
+    fail "mode prompt is missing the single-key/back change"
+fi
+# `b` must re-enter the picker without re-running the search
+if grep -q '^        pick_result$' bin/sail \
+   && [ "$(grep -c '^    do_search$' bin/sail)" -eq 1 ]; then
+    ok "back re-opens the picker without a second search"
+else
+    fail "search and pick are not separated"
+fi
+# a title with an escape must be cleaned before it is echoed
+if grep -q "tr -d '\\\\000-\\\\010\\\\013-\\\\037\\\\177'" bin/sail; then
+    ok "titles are stripped of control characters before display"
+else
+    fail "no control-character strip before display"
+fi
+
+# --- 8. one glyph set, switched in one place ------------------------------
+if grep -qF "G_TL='+'" bin/sail && grep -qF "G_FULL='#'" bin/sail; then
+    ok "SAIL_ASCII selects an ASCII glyph set"
+else
+    fail "no ASCII glyph set in bin/sail"
+fi
+# the pattern is literal text in the file, so single quotes are correct here
+# shellcheck disable=SC2016
+GLYPH_USE="$(grep -cF '"$G_TL" "$G_H"' lib/dashboard.sh || true)"
+if ! grep -q "printf '  ╭─" lib/dashboard.sh && [ "$GLYPH_USE" -ge 1 ]; then
+    ok "dashboard draws from the glyph set, not literals"
+else
+    fail "dashboard still hardcodes box glyphs"
+fi
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

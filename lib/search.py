@@ -109,9 +109,15 @@ def _int(value, default=0):
         return default
 
 
+# C0/C1 controls (ESC, BEL, CR …) let a scraped title move the cursor or
+# rewrite the screen once printed raw; \t \n \r are collapsed separately
+_CTRL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
+
+
 def _clean_title(value):
-    """Single-line title: unescape entities and collapse all whitespace."""
+    """Single-line title: unescape entities, strip controls, collapse spaces."""
     text = html.unescape(str(value if value is not None else "?"))
+    text = _CTRL.sub(" ", text)
     text = re.sub(r"\s+", " ", text).strip()
     return text or "?"
 

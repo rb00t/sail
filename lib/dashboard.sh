@@ -11,6 +11,10 @@
 
 : "${BLD:=}"; : "${DIM:=}"; : "${RED:=}"; : "${GRN:=}"
 : "${YLW:=}"; : "${CYN:=}"; : "${RST:=}"
+# glyphs come from bin/sail's palette block; these defaults keep the file
+# usable when it is sourced on its own
+: "${G_TL:=╭}" "${G_TR:=╮}" "${G_BL:=╰}" "${G_BR:=╯}" "${G_H:=─}"
+: "${G_FULL:=█}" "${G_EMPTY:=░}" "${G_STALE:=!}"
 : "${DASH_H:=15}"
 : "${BAR_W:=30}"
 UTF8_LOCALE="${UTF8_LOCALE:-en_US.UTF-8}"
@@ -21,6 +25,7 @@ fi
 # cell wide … ▉ is 7/8; index = eighths of the current cell). dashboard.sh
 # is sourced standalone by its tests, so it owns its copy.
 PARTS=('' ▏ ▎ ▍ ▌ ▋ ▊ ▉)
+[ "${UNI:-1}" = 0 ] && PARTS=('' '' '' '' '' '' '' '')
 
 # stop the dashboard renderer and clear its block. TERM first (it's usually
 # mid-sleep, and bash only runs its cleanup trap once sleep returns), a
@@ -71,12 +76,12 @@ cutw() {
 # Block chars are split on "|" instead of sliced with substr, which is
 # byte-based under the C locale and would mangle them — same reason the
 # progress bar below is built char-by-char in bash
-spark() {
-    awk -v vals="$1" -v B='▁|▂|▃|▄|▅|▆|▇|█' 'BEGIN {
+spark() {  # $1 = samples (KB/s), $2 = ceiling KB/s (default: the max sample)
+    awk -v vals="$1" -v ceil="${2:-0}" -v B="${SPARK_RAMP:-▁|▂|▃|▄|▅|▆|▇|█}" 'BEGIN {
         n = split(B, ch, "|")
-        max = 0
+        max = ceil + 0
         m = split(vals, v, " ")
-        for (i = 1; i <= m; i++) if ((v[i] + 0) > max) max = v[i] + 0
+        if (max <= 0) for (i = 1; i <= m; i++) if ((v[i] + 0) > max) max = v[i] + 0
         out = ""
         for (i = 1; i <= m; i++) {
             lvl = max > 0 ? int((v[i] + 0) / max * (n - 1) + 0.5) : 0
@@ -86,11 +91,20 @@ spark() {
     }'
 }
 
+# staleness label for the dashboard frame: a silent swarm must not look like
+# a hung renderer. $1 = seconds since the last downloaded byte (wt.js sends it)
+freshness() {
+    local idle="${1:-0}"
+    case "$idle" in ''|*[!0-9]*) idle=0 ;; esac
+    [ "$idle" -lt 5 ] && return 0
+    printf 'no data %ss' "$idle"
+}
+
 render_status() {  # $1 = STREAMING|DOWNLOADING   $2 = what's fetched   $3 = torrent title
     local mode="$1" what="$2" title="$3"
-    local i=0 line peerline peers pct down total speed up upl eta ratio known
+    local i=0 line peerline peers pct down total speed up upl eta ratio known idle=0 lag
     local filled empty k chunk bar pc hist kb addr client d u have slot el
-    local tw=118 peak hv hc rows slots last
+    local tw=118 peakkb=0 cur peakmb hv hc rows slots last
     local ew rem dash_n dashfill tail_n tailfill
     SECONDS=0
     # fit the peer table to the terminal: 10 fixed lines around it (top rule,
@@ -123,18 +137,23 @@ render_status() {  # $1 = STREAMING|DOWNLOADING   $2 = what's fetched   $3 = tor
         up="0.0B/s" upl="0.0B" eta="∞" ratio="0.00" known=0
         case "$line" in
             STATUS*)
-                IFS=$'\t' read -r _ peers pct down total speed up upl eta ratio known <<< "$line"
+                IFS=$'\t' read -r _ peers pct down total speed up upl eta ratio known idle <<< "$line"
                 ;;
         esac
         case "$pct"   in ''|*[!0-9]*) pct=0 ;;   esac
         case "$peers" in ''|*[!0-9]*) peers=0 ;; esac
         case "$known" in ''|*[!0-9]*) known=0 ;; esac
+        case "$idle"  in ''|*[!0-9]*) idle=0 ;;  esac
 
         # speed history — last 42 samples, converted to KB/s, for the sparkline
         kb="$(awk -v s="${speed%/s}" 'BEGIN{ v=s+0; u=s; sub(/^[0-9.]+/,"",u); m=(u~/^KB/)?1024:(u~/^MB/)?1048576:(u~/^GB/)?1073741824:1; printf "%.0f", v*m/1024 }')"
         hist="$(printf '%s' "$hist" | awk -v add="$kb" '{ for (i = 2; i <= NF; i++) printf "%s ", $i; printf "%s", add }')"
-        # scale for the sparkline's dim peak label — max sample, back to human
-        peak="$(printf '%s' "$hist" | awk '{ m = 0; for (i = 1; i <= NF; i++) if (($i + 0) > m) m = $i + 0; printf "%.1f", m * 1024 / 1048576 }')"
+        # a decaying ceiling keeps one spike from flattening the rest, and gives
+        # the sparkline a scale that means the same thing two frames apart
+        cur="$(printf '%s' "$hist" | awk '{ m = 0
+            for (i = 1; i <= NF; i++) if (($i + 0) > m) m = $i + 0
+            printf "%d", m }')"
+        peakkb=$(( cur > peakkb ? cur : peakkb * 97 / 100 ))
         # re-check the terminal width every ~5s: a window shrunk mid-run must
         # not wrap lines past the fixed dashboard height and smear the redraw.
         # stty size < /dev/tty, not tput cols — inside $( ) tput's stdout is
@@ -162,13 +181,13 @@ render_status() {  # $1 = STREAMING|DOWNLOADING   $2 = what's fetched   $3 = tor
         # built char-by-char in bash, not via `tr`: `tr` mangles multi-byte
         # UTF-8 under the C locale (the common default when a shell has no
         # LANG/LC_ALL set), turning the block characters into invalid garbage
-        chunk=""; for ((k = 0; k < filled; k++)); do chunk+="█"; done
+        chunk=""; for ((k = 0; k < filled; k++)); do chunk+="$G_FULL"; done
         bar="${GRN}${chunk}"
         if [ "$rem" -gt 0 ]; then
             bar+="${GRN}${PARTS[$((rem))]}"
             empty=$(( empty - 1 ))
         fi
-        chunk=""; for ((k = 0; k < empty; k++)); do chunk+="░"; done
+        chunk=""; for ((k = 0; k < empty; k++)); do chunk+="$G_EMPTY"; done
         bar+="${DIM}${chunk}${RST}"
         if [ "$peers" -eq 0 ]; then pc="$RED"
         elif [ "$peers" -lt 5 ]; then pc="$YLW"
@@ -181,15 +200,34 @@ render_status() {  # $1 = STREAMING|DOWNLOADING   $2 = what's fetched   $3 = tor
         # block as one object; the ╰ tail closes it. Both spans keep to
         # ASCII/box glyphs, so no wide-cell measuring is needed for the
         # edges (titles stay on their own lines inside)
+        lag="$(freshness "$idle")"
         dash_n=$(( tw - 15 - ${#mode} ))
+        # the stale branch prints " · no data Ns" before the rule: shorten the
+        # rule by exactly that much or the frame wraps and the redraw desyncs
+        [ -n "$lag" ] && dash_n=$(( dash_n - ${#lag} - 3 ))
         [ "$dash_n" -lt 1 ] && dash_n=1
-        printf -v dashfill '─%.0s' $(seq 1 "$dash_n")
+        dashfill=""; for ((k = 0; k < dash_n; k++)); do dashfill+="$G_H"; done
         tail_n=$(( tw - 1 ))
         [ "$tail_n" -lt 1 ] && tail_n=1
-        printf -v tailfill '─%.0s' $(seq 1 "$tail_n")
-        printf '  ╭─ %s%s%s %s%s%s %s· %s ─%s\033[K\n' \
-            "$CYN" "${SPIN[$((i % 10))]}" "$RST" \
-            "$BLD" "$mode" "$RST" "$DIM" "$el" "$dashfill$RST"
+        tailfill=""; for ((k = 0; k < tail_n; k++)); do tailfill+="$G_H"; done
+        if [ -n "$lag" ]; then
+            # a frozen glyph plus the actual number: "still working" and
+            # "nothing is arriving" must never look the same
+            printf '  %s%s %s%s%s %s%s%s %s· %s %s· %s%s %s%s%s\033[K\n' \
+                "$G_TL" "$G_H" \
+                "$YLW" "$G_STALE" "$RST" \
+                "$BLD" "$mode" "$RST" \
+                "$DIM" "$el" \
+                "$YLW" "$lag" "$RST" \
+                "$G_H" "$dashfill" "$RST"
+        else
+            printf '  %s%s %s%s%s %s%s%s %s· %s %s%s%s\033[K\n' \
+                "$G_TL" "$G_H" \
+                "$CYN" "${SPIN[$((i % 10))]}" "$RST" \
+                "$BLD" "$mode" "$RST" \
+                "$DIM" "$el" \
+                "$G_H" "$dashfill" "$RST"
+        fi
         printf '  %s%s%s\033[K\n' "$BLD" "$(cutw "$title" "$tw")" "$RST"
         printf '  %s%s%s\033[K\n' "$DIM" "$(cutw "$what" "$tw")" "$RST"
         printf '  %s  %s%3s%%%s\033[K\n' "$bar" "$BLD" "$pct" "$RST"
@@ -197,8 +235,9 @@ render_status() {  # $1 = STREAMING|DOWNLOADING   $2 = what's fetched   $3 = tor
             "$CYN" "$speed" "$RST" "$YLW" "$up" "$RST" "$DIM" "$ratio" "$RST"
         printf '  %s%s / %s downloaded   %s uploaded   %seta %s%s%s\033[K\n' \
             "$DIM" "$down" "$total" "$upl" "$RST" "$BLD" "$eta" "$RST"
-        printf '  %s%s%s %speak %sMB/s%s\033[K\n' \
-            "$CYN" "$(spark "$hist")" "$RST" "$DIM" "$peak" "$RST"
+        peakmb="$(awk -v k="$peakkb" 'BEGIN { printf "%.1f", k * 1024 / 1048576 }')"
+        printf '  %s%s%s %s21s peak %sMB/s%s\033[K\n' \
+            "$CYN" "$(spark "$hist" "$peakkb")" "$RST" "$DIM" "$peakmb" "$RST"
         printf '  %speers%s %s%s%s / %s%s known%s\033[K\n' \
             "$BLD" "$RST" "$pc" "$peers" "$RST" "$DIM" "$known" "$RST"
         if [ "$tw" -ge 90 ]; then
@@ -245,7 +284,7 @@ render_status() {  # $1 = STREAMING|DOWNLOADING   $2 = what's fetched   $3 = tor
             slot=$((slot + 1))
             printf '\033[K\n'
         done
-        printf '  %s╰%s%s\033[K\n' "$DIM" "$tailfill" "$RST"
+        printf '  %s%s%s%s\033[K\n' "$DIM" "$G_BL" "$tailfill" "$RST"
         i=$((i + 1))
         sleep 0.5
     done

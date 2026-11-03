@@ -135,5 +135,45 @@ else
     fail "render.h height ignored: clears=$CLEARS"
 fi
 
+# --- 5. freshness: a silent swarm must not look like a live one ------------
+awk '/^freshness\(\) \{/ { copy = 1 } copy { print } copy && /^\}/ { exit }' \
+    lib/dashboard.sh > "$W/freshness.sh"
+cat > "$W/case5.sh" <<'EOF'
+set -euo pipefail
+. "$1/freshness.sh"
+printf '[%s]\n' "$(freshness 0)"
+printf '[%s]\n' "$(freshness 4)"
+printf '[%s]\n' "$(freshness 5)"
+printf '[%s]\n' "$(freshness 9)"
+printf '[%s]\n' "$(freshness '')"
+printf '[%s]\n' "$(freshness junk)"
+EOF
+bash "$W/case5.sh" "$W" > "$W/out5" 2>/dev/null || true
+WANT=$'[]\n[]\n[no data 5s]\n[no data 9s]\n[]\n[]'
+if [ "$(cat "$W/out5")" = "$WANT" ]; then
+    ok "freshness: silent for under 5s reads live, then names the gap"
+else
+    fail "freshness labels: [$(cat "$W/out5")]"
+fi
+
+# --- 6. sparkline: a ceiling makes the scale mean something across frames --
+awk '/^spark\(\) \{/ { copy = 1 } copy { print } copy && /^\}/ { exit }' \
+    lib/dashboard.sh > "$W/spark.sh"
+cat > "$W/case6.sh" <<'EOF'
+set -euo pipefail
+SPARK_RAMP='▁|▂|▃|▄|▅|▆|▇|█'
+. "$1/spark.sh"
+printf '[%s]\n' "$(spark '10 20' 1000)"
+printf '[%s]\n' "$(spark '1000' 1000)"
+printf '[%s]\n' "$(spark '10 1000' 0)"
+EOF
+bash "$W/case6.sh" "$W" > "$W/out6" 2>/dev/null || true
+WANT6=$'[▁▁]\n[█]\n[▁█]'
+if [ "$(cat "$W/out6")" = "$WANT6" ]; then
+    ok "sparkline: ceiling scales the bar, no ceiling falls back to the max"
+else
+    fail "sparkline with ceiling: [$(cat "$W/out6")]"
+fi
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

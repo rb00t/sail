@@ -15,6 +15,15 @@ sail_wlist_ui() {
         return 1
     fi
 
+    # the empty case above is answered without a picker; everything below needs
+    # one, and a missing fzf must not look like "user cancelled"
+    command -v fzf >/dev/null 2>&1 || {
+        printf '  %ssail needs fzf%s for the watchlist picker\n' "${BLD:-}" "${RST:-}" >&2
+        printf '  %sinstall it with: brew install fzf%s\n' "${CYN:-}" "${RST:-}" >&2
+        # 2, not 1: the caller treats 1 as "user cancelled" and exits 0
+        return 2
+    }
+
     while :; do
         cp "$(wlist_file)" "$WORK/wlist_rows"
         # display newest first (the file stores newest last); the leading
@@ -39,7 +48,8 @@ sail_wlist_ui() {
         OUT="$(printf '%s\n' "$ROWS" | fzf --ansi --expect=ctrl-x \
               --delimiter='\t' --with-nth=2,3 \
               --query="$WQUERY" \
-              --header="saved     title"$'\n'"${DIM}$(printf '─%.0s' $(seq 1 48))${RST}"$'\n'"  enter: launch   ctrl-x: remove   esc: quit$NOTICE" \
+              --header="$(picker_header 'saved     title' \
+                  'enter: launch  ctrl-x: remove  esc: quit' "$NOTICE")" \
               --header-first --reverse --height=90% --tabstop=1 \
               --border=rounded --margin=1,2)" || return 1
         PICK_KEY="${OUT%%$'\n'*}"

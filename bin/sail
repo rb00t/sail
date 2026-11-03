@@ -28,17 +28,45 @@ set -euo pipefail
 # TERM values, plain SSH, or dumb multiplexers the plain ANSI codes stay.
 # Same slots, same meaning — the upgrade is invisible to everything that
 # only knows 16 colors.
-if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+if [ -t 1 ]; then
     BLD=$'\e[1m'; DIM=$'\e[2m'; RST=$'\e[0m'
-    case "${TERM:-}${COLORTERM:-}" in
-        *256color*|*truecolor*|*24bit*|*direct*|*ghostty*|*kitty*)
-            RED=$'\e[38;5;203m'; GRN=$'\e[38;5;114m'; YLW=$'\e[38;5;215m' \
-            CYN=$'\e[38;5;81m' ;;
-        *)
-            RED=$'\e[31m'; GRN=$'\e[32m'; YLW=$'\e[33m'; CYN=$'\e[36m' ;;
-    esac
+    if [ -z "${NO_COLOR:-}" ]; then
+        case "${TERM:-}${COLORTERM:-}" in
+            *256color*|*truecolor*|*24bit*|*direct*|*ghostty*|*kitty*)
+                RED=$'\e[38;5;203m'; GRN=$'\e[38;5;114m'; YLW=$'\e[38;5;215m' \
+                CYN=$'\e[38;5;81m' ;;
+            *)
+                RED=$'\e[31m'; GRN=$'\e[32m'; YLW=$'\e[33m'; CYN=$'\e[36m' ;;
+        esac
+    else
+        # NO_COLOR governs colour only — bold and dim are not colour, and the
+        # layout still needs hierarchy once the hues are gone
+        RED=""; GRN=""; YLW=""; CYN=""
+    fi
 else
     BLD=""; DIM=""; RED=""; GRN=""; YLW=""; CYN=""; RST=""
+fi
+
+# layout glyphs: UTF-8 by default (every modern terminal), ASCII on request or
+# on a dumb terminal. Width helpers already assume UTF-8; this only decides
+# which glyphs are safe to draw.
+case "${TERM:-}" in dumb) UNI=0 ;; *) UNI=1 ;; esac
+[ "${SAIL_ASCII:-0}" = 1 ] && UNI=0
+export UNI
+if [ "$UNI" = 1 ]; then
+    # shellcheck disable=SC2034  # read by lib/dashboard.sh and lib/sources-ui.sh
+    G_TL='╭'; G_TR='╮'; G_BL='╰'; G_BR='╯'; G_H='─'; G_V='│'; G_RULE='─'
+    # shellcheck disable=SC2034
+    G_FULL='█'; G_EMPTY='░'; G_CHECK='✓'; G_STALE='!'
+    SPARK_RAMP='▁|▂|▃|▄|▅|▆|▇|█'
+    SPIN=(⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏)
+else
+    # shellcheck disable=SC2034
+    G_TL='+'; G_TR='+'; G_BL='+'; G_BR='+'; G_H='-'; G_V='|'; G_RULE='-'
+    # shellcheck disable=SC2034
+    G_FULL='#'; G_EMPTY='.'; G_CHECK='OK'; G_STALE='!'
+    SPARK_RAMP=' |.|:|*|#'
+    SPIN=('|' '/' '-' $'\\' '|' '/' '-' $'\\' '|' '/')
 fi
 
 # UTF-8 locale for the multibyte-safe width helpers (override if a machine
@@ -122,6 +150,24 @@ LIB_DIR="$(cd -P "$(dirname "$SELF")/../lib" >/dev/null 2>&1 && pwd)"
 # shellcheck source=../lib/torrent.sh
 . "$LIB_DIR/torrent.sh"
 
+# every picker is fzf; without it the pipeline's 127 used to be swallowed by
+# `|| exit 0`, so a missing dependency read as a clean run
+require_fzf() {  # $1 = what the picker is for
+    command -v fzf >/dev/null 2>&1 && return 0
+    printf '  %ssail needs fzf%s for the %s\n' "$BLD" "$RST" "$1" >&2
+    printf '  %sinstall it with: brew install fzf%s\n' "$CYN" "$RST" >&2
+    printf '  %sor skip the picker: sail -l <query>%s\n' "$DIM" "$RST" >&2
+    return 1
+}
+
+# every fzf screen shares one header grammar: column labels, a dim rule, then
+# "key: action" hints two spaces apart. $1 = labels, $2 = hints, $3 = notice
+picker_header() {
+    local rule="" k
+    for ((k = 0; k < 64; k++)); do rule+="$G_RULE"; done
+    printf '%s\n%s%s%s\n  %s%s' "$1" "$DIM" "$rule" "$RST" "$2" "${3:-}"
+}
+
 # SIGTERM, give it a moment, then SIGKILL — webtorrent's destroy can hang
 # for a very long time on unreachable trackers
 stop_pid() {
@@ -181,20 +227,10 @@ trap on_signal INT TERM
 # has no business deleting anything.
 rm -rf "$HOME/.cache/sail"
 
-# ---- grow the terminal window so results fit (never shrink) ---------------
-# stty size < /dev/tty rather than tput cols: inside $( ) tput's stdout is a
-# pipe, it can't ioctl the terminal, and it falls back to terminfo's 80
-if [ -t 1 ]; then
-    WANT_C=140; WANT_R=42
-    CUR_C="$(stty size < /dev/tty 2>/dev/null | cut -d' ' -f2 || true)"
-    CUR_R="$(stty size < /dev/tty 2>/dev/null | cut -d' ' -f1 || true)"
-    if [ "${CUR_C:-0}" -lt "$WANT_C" ] || [ "${CUR_R:-0}" -lt "$WANT_R" ]; then
-        NEW_C=$(( CUR_C > WANT_C ? CUR_C : WANT_C ))
-        NEW_R=$(( CUR_R > WANT_R ? CUR_R : WANT_R ))
-        printf '\e[8;%d;%dt' "$NEW_R" "$NEW_C"
-        sleep 0.15
-    fi
-fi
+# the layout adapts to the terminal, it never resizes it: XTWINOPS here used to
+# grow the window (or the tmux pane) on every launch, and a resize the user did
+# not ask for is worse than a narrow picker. fzf's --height and the dashboard's
+# width cap both fit whatever is actually there.
 
 # ---- `sail sources` — choose which sources every search uses --------------
 if [ "${1:-}" = "sources" ]; then
@@ -215,6 +251,10 @@ if [ "${1:-}" = "wlist" ]; then
         WLIST_PICK=1
         set --   # the wlist query is consumed; don't parse it as sail options
     else
+        rc=$?
+        # 2 = a missing dependency, not a cancelled picker: a cancelled picker
+        # is a clean exit, a broken install is not
+        [ "$rc" = 2 ] && exit 1
         exit 0
     fi
 fi
@@ -291,8 +331,8 @@ fi
 
 SEL_TITLE="${SEL_TITLE:-}"
 
-# braille spinner, shared by the search/meta phases and the live dashboard
-SPIN=(⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏)
+# braille spinner, shared by the search/meta phases and the live dashboard —
+# defined with the glyph set above so ASCII mode keeps a spinner too
 
 # ---- search ---------------------------------------------------------------
 
@@ -418,8 +458,10 @@ next_sort() {
     esac
 }
 
-# ---- 1. search + 2. pick --------------------------------------------------
-search_and_pick() {
+# ---- 1. search ------------------------------------------------------------
+# split from the picker so `b` at the mode prompt can re-open the list without
+# paying for the search again: the results file is already in $WORK
+do_search() {
     printf '  searching for %s%s%s ' "$CYN" "$QUERY" "$RST" >&2
     local rc=0 n_results
     sail_search "$QUERY" "$WORK/results" || rc=$?
@@ -431,19 +473,17 @@ search_and_pick() {
     fi
 
     n_results=$(wc -l < "$WORK/results" | tr -d ' ')
-    printf '  %s✓ %s results%s\n\n' "$GRN" "$n_results" "$RST" >&2
+    printf '  %s%s %s results%s\n\n' "$GRN" "$G_CHECK" "$n_results" "$RST" >&2
+}
 
-    # ---- 2. pick a torrent — ctrl-x saves one, ctrl-t re-sorts ------------
-    # --expect makes fzf print the pressed key ahead of the selection, which
-    # is how ctrl-x/ctrl-t are told apart from plain enter; the loop redraws
-    # the list after a save, so several torrents can be watchlisted in one
-    # pass (cmd+x would read better but terminals swallow it for their Edit
-    # menu — CLI apps never see it)
-    local NOTICE="" SORT_MODE="seed" OUT PICK_KEY LINE HEADER_RULE
-    # a dim rule between the column names and the hints turns the header
-    # into a header — one change, reused by every fzf screen in sail
-    printf -v HEADER_RULE '─%.0s' $(seq 1 64)
-    HEADER_RULE="${DIM}${HEADER_RULE}${RST}"
+# ---- 2. pick a torrent — ctrl-x saves one, ctrl-t re-sorts ----------------
+# --expect makes fzf print the pressed key ahead of the selection, which is how
+# ctrl-x/ctrl-t are told apart from plain enter; the loop redraws the list
+# after a save, so several torrents can be watchlisted in one pass (cmd+x
+# would read better but terminals swallow it for their Edit menu)
+pick_result() {
+    require_fzf "results picker" || exit 1
+    local NOTICE="" SORT_MODE="seed" OUT PICK_KEY LINE
     while :; do
         # rows are tab-delimited so fzf can hide the internal row id from the
         # display (--with-nth) while the selection still carries it in field
@@ -465,7 +505,8 @@ search_and_pick() {
                 id, sc, seed, R, size, D, src, R, B, title, R, agecol
         }' | fzf --ansi --expect=ctrl-x,ctrl-t \
               --delimiter='\t' --with-nth=2,3,4,5,6 \
-              --header="seed  size      source title"$'\n'"$HEADER_RULE"$'\n'"  enter: select   ctrl-x: watchlist   ctrl-t: sort ($(sort_label "$SORT_MODE"))   esc: cancel$NOTICE" \
+              --header="$(picker_header 'seed  size      source title' \
+                  "enter: select  ctrl-x: watchlist  ctrl-t: sort ($(sort_label "$SORT_MODE"))  esc: cancel" "$NOTICE")" \
               --header-first --reverse --height=90% --tabstop=1 \
               --border=rounded --margin=1,2)" || exit 0
         PICK_KEY="${OUT%%$'\n'*}"
@@ -570,8 +611,48 @@ print(json.dumps([{"id": "0", "seeders": "", "size": "", "source": "magnet",
 fi
 
 if [ "$SKIP_SEARCH" != 1 ]; then
-    search_and_pick
+    do_search
 fi
+
+# ---- 3. stream or download ------------------------------------------------
+# `b` re-enters the picker without re-searching: the results file is still in
+# $WORK, so going back is instant even though the search was a network call.
+# -s/-d preset MODE, so the loop picks once and leaves without prompting.
+while :; do
+    if [ "$SKIP_SEARCH" != 1 ]; then
+        pick_result
+        [ -n "$MAGNET" ] || exit 0
+    fi
+    [ "$MODE" = "ask" ] || break
+    # titles come from scraped pages and a hand-editable watchlist file — strip
+    # control characters before any of them reaches a terminal that would obey
+    # them (search.py cleans what it scrapes; this covers stored entries)
+    SEL_TITLE="$(printf '%s' "$SEL_TITLE" | tr -d '\000-\010\013-\037\177')"
+    printf '\n  %s%s%s\n' "$BLD" "$SEL_TITLE" "$RST"
+    if [ "$SKIP_SEARCH" = 1 ]; then
+        prompt='stream or download? [S/d/q] '
+    else
+        prompt='stream, download, or back? [S/d/b/q] '
+    fi
+    BACK=0
+    while :; do
+        printf '  %s' "$prompt"
+        answer=""
+        read -r -n 1 answer || true
+        printf '\n'
+        case "$answer" in
+            d|D) MODE="download"; ASK_DIR=1; break ;;
+            q|Q) exit 0 ;;
+            b|B) [ "$SKIP_SEARCH" = 1 ] || { BACK=1; break; } ;;
+            ''|s|S) MODE="stream"; break ;;
+        esac
+    done
+    [ "$BACK" = 1 ] || break
+done
+
+# `-s`/`-d` skip the prompt loop above, so clean once more before the title is
+# handed to the dashboard or a notification
+SEL_TITLE="$(printf '%s' "$SEL_TITLE" | tr -d '\000-\010\013-\037\177')"
 
 # ---- resolve a scraped detail-page URL ------------------------------------
 if [[ "$MAGNET" == FETCH:* ]]; then
@@ -631,19 +712,6 @@ WTMOD="${SAIL_WTMOD:-}"
 # installs, self-resolves when WTMOD is empty; || true because a stale
 # ~/.sail install may not have the script yet — never block sailing on it
 bash "$LIB_DIR/fix-webtorrent.sh" "$WTMOD" || true
-
-# ---- 3. stream or download ------------------------------------------------
-if [ "$MODE" = "ask" ]; then
-    printf '\n  %s%s%s\n' "$BLD" "$SEL_TITLE" "$RST"
-    printf '  stream or download? [S/d/q] '
-    answer=""
-    read -r answer || true
-    case "$answer" in
-        d|D) MODE="download"; ASK_DIR=1 ;;
-        q|Q) exit 0 ;;
-        *)   MODE="stream" ;;
-    esac
-fi
 
 if [ "$MODE" = "download" ]; then
     mkdir -p "$DOWNLOAD_DIR"

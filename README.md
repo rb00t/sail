@@ -57,7 +57,9 @@ While a stream plays, the terminal shows a live dashboard — progress bar,
 download/upload speeds with a scrolling speed sparkline, ETA, ratio, and a
 peer table listing each peer's client (qBittorrent, Transmission, …),
 per-peer speeds, and how much of the torrent it has.
-Quit the player to stop.
+Quit the player to stop. If no bytes arrive, the frame says `no data 42s`
+instead of spinning, so a silent swarm never looks like a slow one; the
+transfer still aborts on its own after `SAIL_STALL_TIMEOUT`.
 
 If the torrent itself includes a subtitle file for the video you picked
 (scene releases for TV episodes often do), sail finds and streams it
@@ -105,7 +107,8 @@ sail sources
 
 This opens a tick-list. Type source numbers to toggle them (for example
 `1 3`), `a` turns all on, `x` turns all off, `s` saves, and `q` quits
-without saving. Your selection is stored in `~/.config/sail/sources.conf` —
+without saving. The header marks the selection `unsaved` as soon as it differs
+from what is on disk. Your selection is stored in `~/.config/sail/sources.conf` —
 one source name per line — and applies globally. You can also edit that file
 by hand; surrounding whitespace and `#` comments are allowed. A missing file
 means the six defaults; a file that exists is authoritative, so saving an
@@ -142,6 +145,10 @@ The result list is sorted by seeders. Press `ctrl-t` to cycle the sort order
 through seeders → size → newest; the header shows the current order. `ctrl-x`
 saves the highlighted torrent to the watchlist and reopens the list, so you
 can save several in one pass. Enter selects; esc cancels.
+
+After Enter, the mode prompt takes a single key — no Return needed: `s` or
+Enter streams, `d` downloads, `b` goes back to the list (the results are still
+in memory, so it does not search again), `q` quits.
 
 ## Watchlist
 
@@ -181,8 +188,11 @@ menu — CLI apps never see that keystroke — so the binding is `ctrl-x`.
 | `SAIL_CACHE_DIR` | `~/.cache/sail/search` | search-result cache location |
 | `SAIL_WTMOD` | discovered | path to the webtorrent module (rarely needed) |
 | `SAIL_UTF8_LOCALE` | `en_US.UTF-8` | locale used for multibyte-safe widths |
+| `SAIL_ASCII` | `0` | `1` draws ASCII glyphs instead of box-drawing and block characters |
 
-Paths accept a leading `~`. `NO_COLOR` disables color output.
+Paths accept a leading `~`. `NO_COLOR` drops colour but keeps bold and dim, so
+the hierarchy survives a monochrome terminal; `SAIL_ASCII=1` (or `TERM=dumb`)
+switches the box, block, spinner and checkmark glyphs to ASCII.
 
 ## Install
 
@@ -217,7 +227,8 @@ cd sail
 ```
 
 The installer sets up everything via Homebrew: `fzf`, `webtorrent-cli`, the IINA
-player, and the `sail` command itself. It installs into a staging directory
+player, and the `sail` command itself. The pickers need `fzf`; if it is
+missing, sail says so and points at `sail -l`, which lists results without one. It installs into a staging directory
 and swaps it in only after a successful copy, so re-running it is the upgrade
 path: an interrupted upgrade leaves the previous version working.
 `./install.sh --dry-run` shows the plan without changing anything.

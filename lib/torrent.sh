@@ -73,15 +73,21 @@ sail_can_serve() {
 # pick_video "$VIDS"        -> single-select (stream mode)
 # pick_video "$VIDS" multi  -> multi-select, tab toggles, ctrl-a/ctrl-d
 pick_video() {
+    command -v fzf >/dev/null 2>&1 || {
+        printf '  %ssail needs fzf%s to pick files\n' "${BLD:-}" "${RST:-}" >&2
+        # 2, not 1: callers treat 1 as "user cancelled" and exit 0
+        return 2
+    }
     # a plain string, not an array: bash 3.2 (macOS's stock /bin/bash) throws
     # "unbound variable" under `set -u` when expanding an empty array with
     # "${arr[@]}" — an empty scalar string has no such problem
     local sorted common_dir fzf_extra="" header
     if [ "${2:-}" = "multi" ]; then
         fzf_extra="--multi --bind ctrl-a:select-all,ctrl-d:deselect-all"
-        header="size      ep      file"$'\n'"${DIM}$(printf '─%.0s' $(seq 1 48))${RST}"$'\n'"  tab toggles · ctrl-a all · ctrl-d none · enter confirms"
+        header="$(picker_header 'size      ep      file' \
+            'tab: toggle  ctrl-a: all  ctrl-d: none  enter: confirm')"
     else
-        header="size      ep      file"$'\n'"${DIM}$(printf '─%.0s' $(seq 1 48))${RST}"$'\n'"  enter: play   esc: cancel"
+        header="$(picker_header 'size      ep      file' 'enter: play  esc: cancel')"
     fi
     # sort by path, not raw torrent-file index: scene releases zero-pad
     # episode numbers (S01E01, S01E10, ...), so alphabetical order is
@@ -153,8 +159,7 @@ sail_pick_stream_file() {
         VID_IDX="$(printf '%s' "$VIDS" | cut -f1)"
     else
         printf '  %smultiple video files — pick one%s\n\n' "$BLD" "$RST"
-        picked="$(pick_video "$VIDS")"
-        [ -n "$picked" ] || return 1
+        picked="$(pick_video "$VIDS")" || return $?
         VID_IDX="$(printf '%s\n' "$picked" | sed $'s/\x1b\\[[0-9;]*m//g' | grep -E '^[0-9]+\t' | cut -f1 | tr -d ' ')"
         [ -n "$VID_IDX" ] || return 1
     fi
@@ -169,8 +174,7 @@ sail_pick_download_files() {
         SEL_IDXS="$(printf '%s' "$VIDS" | cut -f1)"
     else
         printf '  %spick episodes to download%s\n\n' "$BLD" "$RST"
-        picked="$(pick_video "$VIDS" multi)"
-        [ -n "$picked" ] || return 1
+        picked="$(pick_video "$VIDS" multi)" || return $?
         SEL_IDXS="$(printf '%s\n' "$picked" | sed $'s/\x1b\\[[0-9;]*m//g' | grep -E '^[0-9]+\t' | cut -f1 | tr -d ' ' | paste -sd, -)"
         [ -n "$SEL_IDXS" ] || return 1
     fi
@@ -284,7 +288,11 @@ sail_stream() {
         return $?
     fi
 
-    sail_pick_stream_file || return 0
+    sail_pick_stream_file || {
+        # 2 = a missing dependency, which must not read as a cancelled picker
+        [ "$?" = 2 ] && return 2
+        return 0
+    }
     vid_idx="$VID_IDX"
     vid_path="$(awk -F'\t' -v i="$vid_idx" '$1 == i {print $3}' "$WORK/files.tsv")"
 
@@ -434,7 +442,11 @@ sail_download() {
         return $?
     fi
 
-    sail_pick_download_files || return 0
+    sail_pick_download_files || {
+        # 2 = a missing dependency, which must not read as a cancelled picker
+        [ "$?" = 2 ] && return 2
+        return 0
+    }
 
     printf '  downloading %s%d file%s%s to %s%s%s\n\n' \
         "$BLD" "$N_SEL" "$([ "$N_SEL" = 1 ] || printf s)" "$RST" "$CYN" "$dir" "$RST"

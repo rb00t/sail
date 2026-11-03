@@ -8,6 +8,10 @@
 # over the config, so an interrupt can't leave a truncated (authoritative)
 # source list behind.
 
+# glyphs come from bin/sail's palette block; these defaults keep the file
+# usable when sourced on its own (its tests do that)
+: "${G_TL:=╭}" "${G_TR:=╮}" "${G_BL:=╰}" "${G_BR:=╯}" "${G_H:=─}" "${G_V:=│}"
+
 # sail_sources_ui <config-path>
 sail_sources_ui() {
     local CONF="$1"
@@ -50,21 +54,24 @@ sail_sources_ui() {
                 | LC_ALL="$UTF8_LOCALE" wc -m | tr -d ' ')"
             pad=$((ROWW + 12 - vis))
             [ "$pad" -ge 0 ] || pad=0
-            printf '  │ %s%*s│\n' "$ln" "$pad" ""
+            printf '  %s %s%*s%s\033[K\n' "$G_V" "$ln" "$pad" "" "$G_V"
         done <<< "$1"
     }
 
     draw() {
-        local i en=0
+        local i en=0 note=""
         for i in "${!NAMES[@]}"; do
             [ "${ON[$i]}" = 1 ] && en=$((en + 1))
         done
-        printf '\033[H\033[2J'
-        printf '  ╭─'
-        for ((i = 0; i < ROWW + 12; i++)); do printf '─'; done
-        printf '╮\n'
-        boxline "$(printf '%ssources%s — used by every search %s%d/%d enabled%s' \
-            "$BLD" "$RST" "$DIM" "$en" "${#NAMES[@]}" "$RST")"
+        [ "$DIRTY" = 1 ] && note=" ${YLW}· unsaved${RST}"
+        # home, not clear: the screen is repainted line by line so the shell's
+        # scrollback survives, and \033[J drops anything a taller frame left
+        printf '\033[H'
+        printf '  %s%s' "$G_TL" "$G_H"
+        for ((i = 0; i < ROWW + 12; i++)); do printf '%s' "$G_H"; done
+        printf '%s\033[K\n' "$G_TR"
+        boxline "$(printf '%ssources%s — used by every search %s%d/%d enabled%s%s' \
+            "$BLD" "$RST" "$DIM" "$en" "${#NAMES[@]}" "$RST" "$note")"
         boxline ""
         for i in "${!NAMES[@]}"; do
             if [ "${ON[$i]}" = 1 ]; then
@@ -81,9 +88,9 @@ sail_sources_ui() {
         boxline "$(printf 'toggle: number (e.g. %s1 3%s)   %sa%s all   %sx%s none' \
             "$BLD" "$RST" "$BLD" "$RST" "$BLD" "$RST")"
         boxline "$(printf '%ss%s save   %sq%s quit' "$BLD" "$RST" "$BLD" "$RST")$SNOTE"
-        printf '  ╰─'
-        for ((i = 0; i < ROWW + 12; i++)); do printf '─'; done
-        printf '╯\n\n  > '
+        printf '  %s%s' "$G_BL" "$G_H"
+        for ((i = 0; i < ROWW + 12; i++)); do printf '%s' "$G_H"; done
+        printf '%s\033[K\n\n  > \033[K\033[J' "$G_BR"
     }
 
     toggle() {
