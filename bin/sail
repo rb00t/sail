@@ -86,7 +86,7 @@ expand_tilde() {
     fi
 }
 
-SAIL_VERSION="1.5.1"
+SAIL_VERSION="1.6.0"
 DOWNLOAD_DIR="$(expand_tilde "${SAIL_DOWNLOAD_DIR:-${TORRENT_DOWNLOAD_DIR:-$HOME/Downloads/torrents}}")"
 
 usage() {
