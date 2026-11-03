@@ -122,6 +122,39 @@ else
     fail "empty watchlist: rc=$RC out=[$(cat "$W/out")]"
 fi
 
+# --- 4b. launching from the watchlist keeps the saved magnet --------------
+# The watchlist picker sets MAGNET for the launch path. The option parser
+# runs afterwards and must not reset it: an empty id makes webtorrent fail
+# with "Invalid torrent identifier" instead of opening the saved torrent.
+mkdir -p "$W/fakebin" "$W/downloads"
+MAG='magnet:?xt=urn:btih:1111111111111111111111111111111111111111&dn=Watchlisted'
+cat > "$W/fakebin/fzf" <<'FZF'
+#!/usr/bin/env bash
+cat >/dev/null 2>&1 || true
+printf '\n1\t just now Watchlisted Title\n'
+FZF
+cat > "$W/fakebin/osascript" <<'OSA'
+#!/usr/bin/env bash
+cat >/dev/null 2>&1 || true
+printf '%s\n' "$SAIL_DOWNLOAD_DIR"
+OSA
+cat > "$W/fakebin/webtorrent" <<'WT'
+#!/usr/bin/env bash
+printf '%s\n' "$@" > "$SAIL_WT_ARGS"
+exit 1
+WT
+chmod +x "$W/fakebin/fzf" "$W/fakebin/osascript" "$W/fakebin/webtorrent"
+printf 'Watchlisted Title\t%s\t1760000000\n' "$MAG" > "$W/wl.tsv"
+RC="$(printf 'd\n' | run env PATH="$W/fakebin:$PATH" HOME="$W/home" \
+    SAIL_WLIST="$W/wl.tsv" SAIL_DOWNLOAD_DIR="$W/downloads" \
+    SAIL_WT_ARGS="$W/wt.args" SAIL_WTMOD="$W/no-such-module" \
+    bash bin/sail wlist)"
+if [ "$(sed -n '1p' "$W/wt.args" 2>/dev/null)" = "$MAG" ]; then
+    ok "watchlist launch passes the saved magnet through"
+else
+    fail "watchlist launch sent [$(sed -n '1p' "$W/wt.args" 2>/dev/null)] to webtorrent (rc=$RC)"
+fi
+
 # --- 5. ~ in path overrides expands to $HOME ------------------------------
 awk '/^expand_tilde\(\) \{/ { copy = 1 } copy { print } copy && /^\}/ { exit }' \
     bin/sail > "$W/expand.sh"

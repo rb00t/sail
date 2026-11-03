@@ -204,7 +204,7 @@ For a reproducible download, set `SAIL_REF` to a tag and verify it with
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/aasif-alam/sail/main/install.sh \
-  | SAIL_REF=v1.5.0 SAIL_TARBALL_SHA256=<sha256> bash
+  | SAIL_REF=v1.5.1 SAIL_TARBALL_SHA256=<sha256> bash
 ```
 
 Piping the installer from GitHub is trust-on-first-use; if you'd rather
