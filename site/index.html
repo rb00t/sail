@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>sail, torrents from the macOS terminal</title>
+<meta name="description" content="Search, stream, and download torrents entirely from the macOS terminal. Thirteen sources, one prompt, nothing left behind after you quit.">
+<meta name="theme-color" content="#121512">
+<link rel="canonical" href="https://rb00t.github.io/sail/">
+<link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<link rel="preload" href="./fonts/martian-mono-latin.woff2" as="font" type="font/woff2">
+<meta property="og:title" content="sail, torrents from the macOS terminal">
+<meta property="og:description" content="Search, stream, and download torrents entirely from the macOS terminal. Thirteen sources, one prompt, nothing left behind after you quit.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://rb00t.github.io/sail/">
+<link rel="stylesheet" href="./site.css">
+<script>document.documentElement.classList.add('js')</script>
+</head>
+<body id="top">
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="nav">
+  <div class="container nav__in">
+    <a class="brand" href="#top" aria-label="sail, back to the top">sail</a>
+    <nav class="nav__links" aria-label="Page">
+      <a href="#sources">sources</a>
+      <a href="#install">install</a>
+      <a href="https://github.com/rb00t/sail">github</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+  <section class="hero" aria-labelledby="hero-h">
+    <div class="container">
+      <div class="hero__row">
+        <div class="hero__text">
+          <h1 id="hero-h">Search.<br>Stream.<br>Quit.</h1>
+          <p class="lead">Search, stream, and download torrents entirely from the macOS terminal.</p>
+        </div>
+
+        <figure class="session session--live">
+          <div class="session__bar">
+            <span class="session__prompt" aria-hidden="true">$</span>
+            <span>sail sintel</span>
+            <span class="caret" aria-hidden="true"></span>
+          </div>
+          <pre class="term term--live" tabindex="0" aria-label="sail streaming Sintel: 35 percent, 8.7 megabytes per second, 43 peers">
+<span class="term__rule">+-- | STREAMING 0m07s ----------------</span>
+<span class="term__title">  Sintel</span>
+<span class="bar"><span class="bar__fill"><span class="cell" style="--i:0">#</span><span class="cell" style="--i:1">#</span><span class="cell" style="--i:2">#</span><span class="cell" style="--i:3">#</span><span class="cell" style="--i:4">#</span><span class="cell" style="--i:5">#</span><span class="cell" style="--i:6">#</span><span class="cell" style="--i:7">#</span><span class="cell" style="--i:8">#</span><span class="cell" style="--i:9">#</span></span><span class="bar__rest">....................</span>  <span class="term__bold">35%</span></span>
+<span class="term__speed">  v 8.7 MB/s   ^ 40.3 KB/s   ratio 0.00</span>
+<span class="term__dim">  42.8 MB / 123.3 MB   <span class="term__bold">eta 9s</span></span>
+<span class="term__spark">  ....-+*##**-.- <span class="term__dim">peak 21.8 MB/s</span></span>
+<span class="term__wide">  peers 43</span><span class="term__dim"> / 310 known</span>
+<span class="term__head">  client          down        have</span>
+<span class="term__peer">  WebTorrent      12.8 KB/s    0%</span>
+<span class="term__peer">  WebTorrent      6.4 KB/s    <span class="term__full">99%</span></span>
+<span class="term__peer">  qBittorrent     0.0 B/s      0%</span>
+<span class="term__rule">+----------------------------------------</span></pre>
+          <figcaption class="session__cap">Live frame from <code>sail sintel</code>, 10 November 2026. Peer addresses left out.</figcaption>
+        </figure>
+      </div>
+
+      <div class="install">
+        <code id="install-cmd">curl -fsSL https://raw.githubusercontent.com/rb00t/sail/main/install.sh | bash</code>
+        <button class="copy" type="button" data-copy="#install-cmd" aria-describedby="copy-status">copy</button>
+      </div>
+      <p class="hero__note">macOS only. The installer adds Homebrew, fzf, webtorrent and IINA.</p>
+      <p class="visually-hidden" id="copy-status" role="status" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <section class="section sources" id="sources" aria-labelledby="sources-h">
+    <div class="container">
+      <div class="head">
+        <h2 id="sources-h">Thirteen sources, one search.</h2>
+        <p class="lead">Every enabled source is asked at once. One that has not answered in six seconds is dropped, never waited on.</p>
+      </div>
+
+      <table class="src">
+        <caption class="visually-hidden">Built-in sources and how each is read</caption>
+        <thead>
+          <tr><th scope="col">source</th><th scope="col">focus</th><th scope="col">how</th><th scope="col">default</th></tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">tpb</th><td>general</td><td>api</td><td>yes</td></tr>
+          <tr><th scope="row">yts</th><td>movies</td><td>api</td><td>yes</td></tr>
+          <tr><th scope="row">eztv</th><td>TV episodes</td><td>api</td><td>yes</td></tr>
+          <tr><th scope="row">knaben</th><td>aggregator</td><td>scrape</td><td>yes</td></tr>
+          <tr><th scope="row">tcsv</th><td>open data</td><td>api</td><td>yes</td></tr>
+          <tr><th scope="row">solid</th><td>general</td><td>api</td><td>yes</td></tr>
+          <tr><th scope="row">1337x</th><td>general</td><td>scrape</td><td>no</td></tr>
+          <tr><th scope="row">tq</th><td>aggregator</td><td>scrape</td><td>no</td></tr>
+          <tr><th scope="row">et</th><td>movies</td><td>scrape</td><td>no</td></tr>
+          <tr><th scope="row">nyaa</th><td>anime</td><td>scrape</td><td>no</td></tr>
+          <tr><th scope="row">torlock</th><td>verified</td><td>scrape</td><td>no</td></tr>
+          <tr><th scope="row">tgx</th><td>general</td><td>scrape</td><td>no</td></tr>
+          <tr><th scope="row">lime</th><td>general</td><td>scrape</td><td>no</td></tr>
+        </tbody>
+      </table>
+
+      <p class="note">A scrape that breaks is reported and skipped, not hidden: <code>[sources] 8 of 12 unavailable</code>.</p>
+    </div>
+  </section>
+
+  <section class="section results" aria-labelledby="results-h">
+    <div class="container">
+      <h2 id="results-h">Seeders first.</h2>
+      <p class="lead results__lead">ctrl-t cycles size and age; ctrl-x saves a pick without leaving the list.</p>
+
+      <table class="picker">
+        <caption class="visually-hidden">Sintel results, sorted by seeders</caption>
+        <thead>
+          <tr><th scope="col">seed</th><th scope="col">size</th><th scope="col">source</th><th scope="col">title</th><th scope="col">age</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="seed seed--high">192</td><td>123.3MB</td><td class="src">tcsv</td><td class="title">Sintel</td><td class="age">3y ago</td></tr>
+          <tr><td class="seed seed--high">50</td><td>556.65 MB</td><td class="src">knaben</td><td class="title">Sintel.2010.1080p.WEB.H264-CLASSiCALHD</td><td class="age">1y ago</td></tr>
+          <tr><td class="seed seed--mid">25</td><td>136.5MB</td><td class="src">tcsv</td><td class="title">Sintel (2010) [720p] [BluRay] [YTS.MX]</td><td class="age">2y ago</td></tr>
+          <tr><td class="seed seed--mid">23</td><td>136.52 MB</td><td class="src">knaben</td><td class="title">Sintel (2010) 720p BRRip x264 -YTS</td><td class="age">2y ago</td></tr>
+          <tr><td class="seed seed--low">5</td><td>1.19 GB</td><td class="src">knaben</td><td class="title">Durian / Sintel [2010, HDRip 1080p]</td><td class="age">10y ago</td></tr>
+          <tr><td class="seed seed--low">4</td><td>3.48 GB</td><td class="src">knaben</td><td class="title">Durian / Sintel [2010, 4K DMRip]</td><td class="age">10y ago</td></tr>
+        </tbody>
+      </table>
+
+      <p class="picks__hint">enter: select  ctrl-x: watchlist  ctrl-t: sort (seeders)</p>
+      <p class="session__cap">46 results, sorted by seeders. Captured from <code>sail sintel</code> on 10 November 2026.</p>
+    </div>
+  </section>
+
+  <section class="section details" aria-labelledby="details-h">
+    <div class="container">
+      <div class="head">
+        <h2 id="details-h">Nothing left behind.</h2>
+        <p class="lead">Quit the player and the temp video goes. Downloads land in <code>~/Downloads/torrents</code>.</p>
+      </div>
+      <div class="facts">
+        <div class="fact">
+          <h3>Only the episodes you pick</h3>
+          <p>Tab toggles files in a season pack; ctrl-a takes all.</p>
+        </div>
+        <div class="fact">
+          <h3>Subtitles ride along</h3>
+          <p>Sintel carried ten; the English one attaches itself.</p>
+        </div>
+        <div class="fact">
+          <h3>Five minutes of search cache</h3>
+          <p>Repeated queries skip the network. Video is never cached.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section install-band" id="install" aria-labelledby="install-h">
+    <div class="container">
+      <h2 id="install-h">Run it twice.</h2>
+      <p class="lead">First run installs, second upgrades in place. It sets up its own dependencies.</p>
+      <div class="install">
+        <code id="install-cmd-2">curl -fsSL https://raw.githubusercontent.com/rb00t/sail/main/install.sh | bash</code>
+        <button class="copy copy--quiet" type="button" data-copy="#install-cmd-2" aria-describedby="copy-status-2">copy</button>
+      </div>
+      <p class="visually-hidden" id="copy-status-2" role="status" aria-live="polite"></p>
+      <p class="note">Add <code>--dry-run</code> to print every change and write nothing. <a href="https://github.com/rb00t/sail#install">Read the installer</a>.</p>
+    </div>
+  </section>
+
+</main>
+
+<footer class="foot">
+  <div class="container foot__in">
+    <p class="foot__mark">sail</p>
+    <div class="foot__col">
+      <nav class="foot__links" aria-label="Elsewhere">
+        <a href="https://github.com/rb00t/sail">github</a>
+        <a href="https://codeberg.org/aasif-alam/sail">codeberg</a>
+        <a href="https://github.com/rb00t/sail/blob/main/LICENSE">MIT licence</a>
+      </nav>
+      <p class="foot__legal">Only download content you are legally permitted to obtain.</p>
+      <p class="foot__meta">Terminal captures taken 10 November 2026, sail 1.6.0. Martian Mono is under the <a href="./fonts/OFL.txt">SIL Open Font License</a>.</p>
+    </div>
+  </div>
+</footer>
+
+<script src="./main.js" defer></script>
+</body>
+</html>

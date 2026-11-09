@@ -227,7 +227,9 @@ cd sail
 ```
 
 The installer sets up everything via Homebrew: `fzf`, `webtorrent-cli`, the IINA
-player, and the `sail` command itself. The pickers need `fzf`; if it is
+player, and the `sail` command itself. The one-page site at
+[rb00t.github.io/sail](https://rb00t.github.io/sail/) carries the same command
+and a live capture of the picker and the dashboard. The pickers need `fzf`; if it is
 missing, sail says so and points at `sail -l`, which lists results without one. It installs into a staging directory
 and swaps it in only after a successful copy, so re-running it is the upgrade
 path: an interrupted upgrade leaves the previous version working.

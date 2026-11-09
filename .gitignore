@@ -4,3 +4,6 @@
 .ruff_cache/
 __pycache__/
 *.pyc
+
+# site render artifacts
+site/.hallmark/
