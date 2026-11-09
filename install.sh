@@ -62,10 +62,10 @@ if [ -z "$SELF_DIR" ] || [ ! -f "$SELF_DIR/bin/sail" ]; then
     TMP="$(mktemp -d)"
     TARBALL="$TMP/sail.tar.gz"
     curl -fsSL \
-        "https://github.com/aasif-alam/sail/archive/refs/heads/$REF.tar.gz" \
+        "https://github.com/rb00t/sail/archive/refs/heads/$REF.tar.gz" \
         -o "$TARBALL" \
         || curl -fsSL \
-            "https://github.com/aasif-alam/sail/archive/refs/tags/$REF.tar.gz" \
+            "https://github.com/rb00t/sail/archive/refs/tags/$REF.tar.gz" \
             -o "$TARBALL" \
         || err "could not download sail $REF — check SAIL_REF."
 

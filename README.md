@@ -200,20 +200,20 @@ Requires macOS. The one-liner — installs Homebrew if it's missing, then
 everything else itself:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/aasif-alam/sail/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/rb00t/sail/main/install.sh | bash
 ```
 
 To see every change first, pass `--dry-run` (it touches nothing):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/aasif-alam/sail/main/install.sh | bash -s -- --dry-run
+curl -fsSL https://raw.githubusercontent.com/rb00t/sail/main/install.sh | bash -s -- --dry-run
 ```
 
 For a reproducible download, set `SAIL_REF` to a tag and verify it with
 `SAIL_TARBALL_SHA256` (both apply to the piped installer):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/aasif-alam/sail/main/install.sh \
+curl -fsSL https://raw.githubusercontent.com/rb00t/sail/main/install.sh \
   | SAIL_REF=v1.6.0 SAIL_TARBALL_SHA256=<sha256> bash
 ```
 
@@ -221,7 +221,7 @@ Piping the installer from GitHub is trust-on-first-use; if you'd rather
 inspect before executing, clone and run it directly — it behaves identically:
 
 ```bash
-git clone https://github.com/aasif-alam/sail.git
+git clone https://github.com/rb00t/sail.git
 cd sail
 ./install.sh
 ```
