@@ -76,7 +76,22 @@ else
     fail "help/version deleted the cache (rc=$RC/$RC2)"
 fi
 
-# --- 3d. invalid magnet links are rejected before any work -----------------
+# --- 3d. a normal run keeps the search cache and clears legacy entries ----
+mkdir -p "$W/home2/.cache/sail/search" "$W/home2/.cache/sail/legacy"
+printf 'keep\n' > "$W/home2/.cache/sail/search/answer"
+printf 'old\n' > "$W/home2/.cache/sail/legacy/file"
+RC=0
+printf 'q' | env HOME="$W/home2" SAIL_SOURCES="$W/home2/sources.conf" \
+    bash bin/sail sources >/dev/null 2>&1 || RC=$?
+if [ "$RC" -eq 0 ] \
+   && [ -f "$W/home2/.cache/sail/search/answer" ] \
+   && [ ! -e "$W/home2/.cache/sail/legacy" ]; then
+    ok "normal run keeps the search cache, clears legacy entries"
+else
+    fail "normal run touched the search cache or kept legacy (rc=$RC)"
+fi
+
+# --- 3e. invalid magnet links are rejected before any work -----------------
 RC="$(run bash bin/sail --magnet 'https://example.com/not-a-magnet')"
 if [ "$RC" -eq 1 ] && grep -q 'not a magnet link' "$W/err"; then
     ok "invalid --magnet exits 1 with a clear error"

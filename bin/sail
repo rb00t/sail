@@ -221,11 +221,16 @@ on_signal() {
 trap cleanup EXIT
 trap on_signal INT TERM
 
-# no torrent data persists between runs — wipe any leftover cache from
-# before this behavior existed (nothing writes here anymore, so after the
-# first launch this is a no-op). After the fast paths: `sail --version`
-# has no business deleting anything.
-rm -rf "$HOME/.cache/sail"
+# no legacy torrent data persists between runs. The old whole-directory wipe
+# here also deleted ~/.cache/sail/search, so the search cache never survived a
+# second launch; only unknown entries are cleared now.
+if [ -d "$HOME/.cache/sail" ]; then
+    for entry in "$HOME/.cache/sail"/*; do
+        [ -e "$entry" ] || continue
+        [ "${entry##*/}" = search ] && continue
+        rm -rf "$entry"
+    done
+fi
 
 # the layout adapts to the terminal, it never resizes it: XTWINOPS here used to
 # grow the window (or the tmux pane) on every launch, and a resize the user did
