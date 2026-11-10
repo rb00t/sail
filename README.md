@@ -347,5 +347,5 @@ Only download content you are legally permitted to obtain.
 
 - [Site](https://rb00t.github.io/sail/)
 - [GitHub](https://github.com/rb00t/sail)
-- [Codeberg mirror](https://codeberg.org/aasif-alam/sail)
+- [Codeberg mirror](https://codeberg.org/rb00t/sail)
 - [Public domain (Unlicense)](UNLICENSE)
