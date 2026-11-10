@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="site/sail-wordmark-dark.svg">
-    <img src="site/sail-wordmark-light.svg" alt="sail" width="164">
+    <img src="site/sail-wordmark-light.svg" alt="sail" width="200">
   </picture>
 </p>
 
