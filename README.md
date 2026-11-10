@@ -3,7 +3,7 @@
 **Search, stream, and download torrents from the macOS terminal.**
 
 [![macOS](https://img.shields.io/badge/macOS-only-1f2328?style=flat-square&logo=apple&logoColor=white)](#install)
-[![MIT licence](https://img.shields.io/badge/licence-MIT-1f2328?style=flat-square)](LICENSE)
+[![public domain](https://img.shields.io/badge/licence-public%20domain-1f2328?style=flat-square)](UNLICENSE)
 [![site](https://img.shields.io/badge/site-rb00t.github.io%2Fsail-b6f3c1?style=flat-square&labelColor=1f2328)](https://rb00t.github.io/sail/)
 
 Type a title. Pick a result. It plays.
@@ -348,4 +348,4 @@ Only download content you are legally permitted to obtain.
 - [Site](https://rb00t.github.io/sail/)
 - [GitHub](https://github.com/rb00t/sail)
 - [Codeberg mirror](https://codeberg.org/aasif-alam/sail)
-- [MIT licence](LICENSE)
+- [Public domain (Unlicense)](UNLICENSE)
