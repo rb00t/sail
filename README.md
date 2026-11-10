@@ -1,10 +1,19 @@
-# sail
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="site/sail-wordmark-dark.svg">
+    <img src="site/sail-wordmark-light.svg" alt="sail" width="164">
+  </picture>
+</p>
 
-**Search, stream, and download torrents from the macOS terminal.**
+<p align="center">
+  Search, stream, and download torrents from the macOS terminal.
+</p>
 
-[![macOS](https://img.shields.io/badge/macOS-only-1f2328?style=flat-square&logo=apple&logoColor=white)](#install)
-[![public domain](https://img.shields.io/badge/licence-public%20domain-1f2328?style=flat-square)](UNLICENSE)
-[![site](https://img.shields.io/badge/site-rb00t.github.io%2Fsail-b6f3c1?style=flat-square&labelColor=1f2328)](https://rb00t.github.io/sail/)
+<p align="center">
+  <a href="https://rb00t.github.io/sail/"><img alt="site" src="https://img.shields.io/badge/site-rb00t.github.io%2Fsail-1f2328?style=flat-square"></a>
+  <img alt="macOS only" src="https://img.shields.io/badge/macOS-only-1f2328?style=flat-square&logo=apple&logoColor=white">
+  <a href="UNLICENSE"><img alt="public domain" src="https://img.shields.io/badge/licence-public%20domain-1f2328?style=flat-square"></a>
+</p>
 
 Type a title. Pick a result. It plays.
 
