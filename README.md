@@ -1,8 +1,61 @@
 # sail
 
-Search, stream, and download torrents entirely from the macOS terminal.
+**Search, stream, and download torrents from the macOS terminal.**
 
-## Usage
+[![macOS](https://img.shields.io/badge/macOS-only-1f2328?style=flat-square&logo=apple&logoColor=white)](#install)
+[![MIT licence](https://img.shields.io/badge/licence-MIT-1f2328?style=flat-square)](LICENSE)
+[![site](https://img.shields.io/badge/site-rb00t.github.io%2Fsail-b6f3c1?style=flat-square&labelColor=1f2328)](https://rb00t.github.io/sail/)
+
+Type a title. Pick a result. It plays.
+
+sail searches up to thirteen torrent sources at once (six by default), streams
+in IINA, mpv or VLC, and downloads with a live view of speed, peers and
+progress. No account, no remote service. Quit and the temporary video is wiped;
+downloads land in `~/Downloads/torrents`.
+
+**[See the captures](https://rb00t.github.io/sail/)**
+
+## Install
+
+Requires macOS. One command installs Homebrew if it is missing, then Python 3
+if needed, `fzf`, `webtorrent-cli`, IINA and sail itself:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/rb00t/sail/main/install.sh | bash
+```
+
+Run the same command again to upgrade.
+
+## The first 30 seconds
+
+```bash
+sail dune          # search, pick a result, then stream or download
+sail -s dune       # stream the picked result
+sail -d dune       # download the picked result
+sail wlist         # saved torrents
+sail sources       # choose the sites every search uses
+```
+
+The pickers show their keys in the header.
+
+## What you get
+
+- **Up to thirteen sources, one search.** Six are on by default. A source that
+  has not answered within six seconds is dropped for that search.
+- **A transfer dashboard.** Progress, download and upload speed, a speed
+  sparkline, ETA, ratio, and a peer table with each peer's client and how much
+  it has. If no bytes arrive, the frame says `no data 42s` instead of pretending
+  to work.
+- **Subtitles from the torrent.** If the release includes one that matches the
+  video, sail streams it alongside. No subtitle service, no API key.
+- **Only the files you picked.** A season pack shows a picker; only the chosen
+  episodes are written, and an interrupted run leaves a hidden stage, not loose
+  files.
+
+## All the details
+
+<details>
+<summary><strong>Commands, pipes and exit codes</strong></summary>
 
 | Command | Behavior |
 |---|---|
@@ -13,7 +66,7 @@ Search, stream, and download torrents entirely from the macOS terminal.
 | `sail --json <query>` | print results as a JSON array and exit |
 | `sail --magnet <link>` | skip the search and use a magnet link directly |
 | `sail sources` | choose which sources every search uses |
-| `sail wlist [query]` | launch or manage the watchlist (save from results with ctrl-x) |
+| `sail wlist [query]` | launch or manage the watchlist (save from results with `ctrl-x`) |
 | `sail --version`, `sail -v` | print the installed version |
 | `sail -h`, `sail --help` | show usage and exit |
 
@@ -22,99 +75,79 @@ query starting with `-` is still searchable: `sail -- -movie`.
 
 `sail -l` is pipe-friendly: it prints one row per result (`seeders`, `size`,
 `source`, `title`) and sends the spinner and source warnings to stderr.
-`sail --json` emits an array of objects with `id`, `seeders`, `size`,
-`source`, `title`, `age`, and `magnet` (scraped sources may put a
-`FETCH:<url>` detail-page marker in `magnet` until it is resolved). Their
-exit statuses: `0` success, `1` no results (list mode), `2` every source
-failed, `3` no sources enabled.
+`sail --json` emits an array of objects with `id`, `seeders`, `size`, `source`,
+`title`, `age`, and `magnet` (a scraped source may leave a `FETCH:<url>`
+detail-page marker in `magnet`; sail resolves it only when streaming or
+downloading).
 
-Downloads go to `~/Downloads/torrents` (override with `SAIL_DOWNLOAD_DIR`,
-or the older `TORRENT_DOWNLOAD_DIR`; the former wins).
+`sail -l` exit statuses: `0` success, `1` no results, `2` every source failed,
+`3` no sources enabled. An interactive search that fails exits `1`; `ctrl+c`
+exits `130`.
 
-Set `SAIL_DEBUG=1` to see each source's own errors (timeouts, parse
-failures) after a search that comes back thin, and why a subtitle already
-in the torrent (if any) failed to fetch — normally both are discarded so
-a broken scraper or a missing subtitle doesn't clutter the output.
+Downloads go to `~/Downloads/torrents` (override with `SAIL_DOWNLOAD_DIR`, or
+the older `TORRENT_DOWNLOAD_DIR`; the former wins).
+
+Set `SAIL_DEBUG=1` to see each source's own errors (timeouts, parse failures)
+after a search that comes back thin, and why a subtitle already in the torrent
+failed to fetch. Without it, only the one-line source summary is shown.
+
+</details>
+
+<details>
+<summary><strong>Searching, caching and streaming</strong></summary>
 
 A search races every enabled source in parallel and is bounded overall by
-`SAIL_SEARCH_TIMEOUT` (default 6 seconds): a source that has not answered
-by then is dropped for that search and reported unavailable, instead of
-being allowed to define the search time. Repeating a query within
-`SAIL_CACHE_TTL` (default 5 minutes) reuses the previous per-source
-answers, so a near-instant rerun costs no traffic; `SAIL_NO_CACHE=1`
-turns that off. Only successful, non-empty source answers are cached — a
-source that failed or came back empty is retried next time.
+`SAIL_SEARCH_TIMEOUT` (default 6 seconds): a source that has not answered by
+then is dropped for that search and reported unavailable, instead of being
+allowed to define the search time. Repeating a query within `SAIL_CACHE_TTL`
+(default 5 minutes) reuses the previous per-source answers, so a near-instant
+rerun costs no traffic; `SAIL_NO_CACHE=1` turns that off. Only successful,
+non-empty source answers are cached, so a source that failed is retried next
+time.
 
-When streaming a torrent with more than one video file (season packs,
-movies with extras), sail shows a picker so you choose exactly which one
-plays — only that file is downloaded, never the whole torrent. A single
-video file plays immediately with no picker.
+When streaming a torrent with more than one video file (season packs, movies
+with extras), sail shows a picker so you choose exactly which one plays. Only
+that file is downloaded, never the whole torrent. A single video plays straight
+away.
 
-Streaming uses IINA, mpv, or VLC, whichever is found first (in that order).
-Set `SAIL_PLAYER=iina`, `mpv`, or `vlc` to pick one; if it isn't installed
-sail says so and falls back to the normal order.
-While a stream plays, the terminal shows a live dashboard — progress bar,
-download/upload speeds with a scrolling speed sparkline, ETA, ratio, and a
-peer table listing each peer's client (qBittorrent, Transmission, …),
-per-peer speeds, and how much of the torrent it has.
-Quit the player to stop. If no bytes arrive, the frame says `no data 42s`
-instead of spinning, so a silent swarm never looks like a slow one; the
-transfer still aborts on its own after `SAIL_STALL_TIMEOUT`.
+Players are tried in this order: IINA, mpv, VLC. Set `SAIL_PLAYER=iina`, `mpv`,
+or `vlc` to pick one; if it is not installed, sail says so and falls back to the
+normal order.
 
-If the torrent itself includes a subtitle file for the video you picked
-(scene releases for TV episodes often do), sail finds and streams it
-alongside the video automatically — no external subtitle service, no API
-key, no rate limit. It only attaches a subtitle it's confident matches: an exact filename
-match, the same name plus a language suffix (English preferred when more
-than one language is present), or — as a last resort — any subtitle file
-in the same folder as the video. If nothing matches confidently, streaming
-proceeds without one, silently unless `SAIL_DEBUG=1` is set.
+If the torrent includes a subtitle file for the video you picked, sail finds and
+streams it automatically, preferring an exact filename match, then the same name
+plus a language suffix (English first when several languages are present), then
+any subtitle file in the same folder as the video. If nothing matches, streaming
+continues without one.
 
-A macOS notification fires when a download finishes or fails. Set `SAIL_NOTIFY=0` to turn notifications off.
+A macOS notification fires when a download finishes or fails. Set
+`SAIL_NOTIFY=0` to turn notifications off.
 
-Nothing is cached: torrent metadata is fetched fresh on every stream, the
-downloaded video lives in a temp directory that's wiped the moment you quit
-the player, and any leftover data from a previous version of sail is
-removed on startup. Ctrl+C tears the renderer and any torrent/server child
-down before exiting, so the next run doesn't collide with an orphaned
-process.
-
-Downloading (`sail -d`) uses the same picker: a season pack with several
-video files lets you pick exactly which ones to save — tab toggles, ctrl-a
-selects all, ctrl-d clears. Bytes are staged in a hidden
-`.sail-partial-<pid>-*` directory inside the destination; only the files
-you picked are moved into place once complete, so fragments of unselected
-neighbours never litter the folder and an existing file is never deleted.
-An interrupted download leaves only that hidden stage, which the next
-download into the same folder removes. Make sure the destination has room
-for the picked files (the stage is on the same filesystem, so the final
-move is a rename, not a second copy). A live dashboard tracks progress the
-same way streaming does.
-
-If the swarm goes silent — no bytes for 300 seconds — sail stops with a
+If the swarm goes silent (no bytes for 300 seconds), sail stops with a
 `stalled: no data received` error instead of hanging forever. Change the
-timeout with `SAIL_STALL_TIMEOUT` (seconds; `0` disables the watchdog).
-Metadata has a separate `SAIL_META_WAIT` (default 300 seconds) per attempt,
-with one retry.
+timeout with `SAIL_STALL_TIMEOUT` (seconds; `0` disables the watchdog). Metadata
+has its own `SAIL_META_WAIT` (default 300 seconds) per attempt, with one retry.
 
-## Sources
+</details>
+
+<details>
+<summary><strong>Sources</strong></summary>
 
 Thirteen sources are built in. Pick and choose the ones every search uses:
 
-```
+```bash
 sail sources
 ```
 
-This opens a tick-list. Type source numbers to toggle them (for example
-`1 3`), `a` turns all on, `x` turns all off, `s` saves, and `q` quits
-without saving. The header marks the selection `unsaved` as soon as it differs
-from what is on disk. Your selection is stored in `~/.config/sail/sources.conf` —
-one source name per line — and applies globally. You can also edit that file
-by hand; surrounding whitespace and `#` comments are allowed. A missing file
-means the six defaults; a file that exists is authoritative, so saving an
-empty list searches no sources. Saves are atomic, and a typo'd name is
-reported (`[sources] ignoring unknown source name(s): …`) instead of
-silently searching fewer sites.
+Type source numbers to toggle them (for example `1 3`), `a` turns all on, `x`
+turns all off, `s` saves, and `q` quits without saving. The header marks the
+selection `unsaved` as soon as it differs from what is on disk. Your selection
+lives in `~/.config/sail/sources.conf`, one source name per line, and applies
+globally. You can edit that file by hand; whitespace and `#` comments are
+allowed. A missing file means the six defaults; an existing file is
+authoritative, so saving an empty list searches no sources. Saves are atomic,
+and a typo'd name is reported (`[sources] ignoring unknown source name(s): …`)
+instead of silently searching fewer sites.
 
 | Source | Focus | Method |
 |---|---|---|
@@ -133,43 +166,57 @@ silently searching fewer sites.
 | `lime` | general | HTML scrape |
 
 With no config file, searches use `tpb`, `yts`, `eztv`, `knaben`, `tcsv`, and
-`solid`.
-Scraped sources depend on site layout and can break when sites change;
-a failing source never blocks the others. When some sources are down, sail
-prints a one-line `[sources] N of M unavailable` summary; set
-`SAIL_DEBUG=1` to see each failure.
+`solid`. Scraped sources depend on site layout and can break when sites change;
+a failing source never blocks the others. When some are down, sail prints a
+one-line `[sources] N of M unavailable` summary. Set `SAIL_DEBUG=1` to see each
+failure.
 
-## Results picker
+</details>
 
-The result list is sorted by seeders. Press `ctrl-t` to cycle the sort order
-through seeders → size → newest; the header shows the current order. `ctrl-x`
-saves the highlighted torrent to the watchlist and reopens the list, so you
-can save several in one pass. Enter selects; esc cancels.
+<details>
+<summary><strong>Picker, watchlist and downloads</strong></summary>
 
-After Enter, the mode prompt takes a single key — no Return needed: `s` or
-Enter streams, `d` downloads, `b` goes back to the list (the results are still
+**Results picker.** The list is sorted by seeders. `ctrl-t` cycles seeders →
+size → newest; the header shows the current order. `ctrl-x` saves the
+highlighted torrent to the watchlist and reopens the list, so you can save
+several in one pass. `enter` selects; `esc` cancels.
+
+After Enter, the mode prompt takes a single key, no Return needed: `s` or
+`enter` streams, `d` downloads, `b` goes back to the list (the results are still
 in memory, so it does not search again), `q` quits.
 
-## Watchlist
+**Watchlist.** `ctrl-x` on any result saves it; the list stays open and the
+header confirms each save. `sail wlist` shows saved torrents: `enter` launches
+one straight to the stream/download prompt (no search), `ctrl-x` removes it,
+`esc` quits. An optional query narrows the list: `sail wlist dune`.
 
-Press `ctrl-x` on any search result to save it to the watchlist — the list
-stays open so you can save several in one pass, and the header confirms each
-save. `sail wlist` shows saved torrents: enter launches one straight to the
-stream/download prompt (the search step is skipped entirely), `ctrl-x`
-removes it, esc quits. An optional query narrows the list: `sail wlist dune`.
+Entries live in `~/.config/sail/wlist.tsv` (title, magnet link, date added in
+Unix seconds, one per line) and are safe to edit by hand. Scraped results are stored as a
+detail-page URL until saved, at which point sail resolves a real magnet link, so
+a saved entry still launches after it has left the search results. If the page
+is down at save time, the URL is kept and retried at launch. Re-adding a torrent
+moves it to the top instead of duplicating it.
 
-Entries live in `~/.config/sail/wlist.tsv` — title, magnet link, and the
-date added, one per line, safe to edit by hand. Scraped results are stored
-as a detail-page URL until they are saved, at which point sail resolves it
-to a real magnet link — so a saved entry still launches long after it has
-left the search results (if the page is down at save time, the unresolved
-URL is kept and retried at launch). Re-adding a torrent moves it to the top
-instead of duplicating it.
+**Downloads.** `sail -d` uses the same file picker: `tab` toggles, `ctrl-a`
+selects all, `ctrl-d` clears. Bytes are staged in a hidden
+`.sail-partial-<pid>-*` directory inside the destination; only the files you
+picked are moved into place once complete, so files you did not pick are never
+touched; a picked file replaces a same-named file in the destination. An interrupted
+download leaves only that hidden stage, which the next download into the same
+folder removes. The stage is on the same filesystem, so the final move is a
+rename, not a second copy, but make sure the destination has room for the picked
+files. A live dashboard tracks progress the same way streaming does.
 
-`cmd+x` would have read nicer, but terminals swallow it for their Edit
-menu — CLI apps never see that keystroke — so the binding is `ctrl-x`.
+**Streaming cleanup.** Nothing is kept: torrent metadata is fetched fresh on
+every stream, and the downloaded video lives in a temp directory wiped the
+moment you quit the player. `ctrl+c` tears the renderer and any torrent/server
+child down before exiting, so the next run does not collide with an orphaned
+process.
 
-## Configuration
+</details>
+
+<details>
+<summary><strong>Configuration</strong></summary>
 
 | Variable | Default | Purpose |
 |---|---|---|
@@ -190,20 +237,16 @@ menu — CLI apps never see that keystroke — so the binding is `ctrl-x`.
 | `SAIL_UTF8_LOCALE` | `en_US.UTF-8` | locale used for multibyte-safe widths |
 | `SAIL_ASCII` | `0` | `1` draws ASCII glyphs instead of box-drawing and block characters |
 
-Paths accept a leading `~`. `NO_COLOR` drops colour but keeps bold and dim, so
+Source, watchlist and download paths accept a leading `~`. `NO_COLOR` drops colour but keeps bold and dim, so
 the hierarchy survives a monochrome terminal; `SAIL_ASCII=1` (or `TERM=dumb`)
 switches the box, block, spinner and checkmark glyphs to ASCII.
 
-## Install
+</details>
 
-Requires macOS. The one-liner — installs Homebrew if it's missing, then
-everything else itself:
+<details>
+<summary><strong>Installer options, uninstall and shell completion</strong></summary>
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/rb00t/sail/main/install.sh | bash
-```
-
-To see every change first, pass `--dry-run` (it touches nothing):
+To see every change without writing anything, add `--dry-run`:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/rb00t/sail/main/install.sh | bash -s -- --dry-run
@@ -217,8 +260,8 @@ curl -fsSL https://raw.githubusercontent.com/rb00t/sail/main/install.sh \
   | SAIL_REF=v1.6.0 SAIL_TARBALL_SHA256=<sha256> bash
 ```
 
-Piping the installer from GitHub is trust-on-first-use; if you'd rather
-inspect before executing, clone and run it directly — it behaves identically:
+Piping the installer is trust-on-first-use; if you would rather inspect it
+first, clone and run it directly. It runs the same installer:
 
 ```bash
 git clone https://github.com/rb00t/sail.git
@@ -226,33 +269,29 @@ cd sail
 ./install.sh
 ```
 
-The installer sets up everything via Homebrew: `fzf`, `webtorrent-cli`, the IINA
-player, and the `sail` command itself. The one-page site at
-[rb00t.github.io/sail](https://rb00t.github.io/sail/) carries the same command
-and a live capture of the picker and the dashboard. The pickers need `fzf`; if it is
-missing, sail says so and points at `sail -l`, which lists results without one. It installs into a staging directory
-and swaps it in only after a successful copy, so re-running it is the upgrade
-path: an interrupted upgrade leaves the previous version working.
+Homebrew installs `fzf`, `webtorrent-cli` and IINA; `sail` itself is copied to
+`~/.sail` and symlinked onto PATH. The pickers need `fzf`; if it is missing, sail says so and
+points at `sail -l`, which lists results without one. The install goes into a
+staging directory and swaps in only after a successful copy, so re-running it is
+the upgrade path: an interrupted upgrade leaves the previous version working.
 `./install.sh --dry-run` shows the plan without changing anything.
 
-## Uninstall
+**Uninstall.**
 
 ```bash
 ./uninstall.sh            # removes sail, keeps your sources/watchlist
 ./uninstall.sh --purge    # also removes ~/.config/sail
 ```
 
-Dependencies installed by Homebrew are left alone; the script prints the
-command to remove them too.
+Homebrew dependencies are left alone; the script prints the command to remove
+them too.
 
-## Shell completion
-
-Tab-completion for the flags, `sources`, and `wlist` lives in `completions/`.
-Source the file for your shell, or drop it wherever your shell auto-loads
-completions:
+**Shell completion.** Tab-completion for the flags, `sources`, and `wlist` lives
+in `completions/`. Source the file for your shell, or drop it wherever your shell
+loads completions:
 
 ```bash
-# zsh (e.g. Homebrew's site-functions dir, already on most fpaths)
+# zsh (e.g. Homebrew's site-functions dir, already on most $fpath entries)
 cp completions/_sail "$(brew --prefix)/share/zsh/site-functions/_sail"
 
 # bash (needs bash-completion)
@@ -261,32 +300,52 @@ cp completions/sail.bash "$(brew --prefix)/etc/bash_completion.d/sail"
 
 `install.sh` copies both in automatically when it finds those directories.
 
-## Development
+</details>
+
+<details>
+<summary><strong>Development and tests</strong></summary>
 
 ```bash
 bash tests/run-all.sh
 ```
 
 That runs the Python tests (every network call is mocked) and every shell
-suite: watchlist storage and its lock, the tmux-driven pickers, `wt.js`
-metadata and staged downloads, the sources UI, the download dashboard, CLI
-exit statuses, and installer/uninstaller behavior. Individual suites are
-`tests/test_*.sh`; `python3 -m unittest discover tests` runs only the Python
-ones.
+suite: watchlist storage and its lock, the tmux-driven pickers, `wt.js` metadata
+and staged downloads, the sources UI, the download dashboard, CLI exit statuses,
+and installer/uninstaller behavior. Individual suites are `tests/test_*.sh`;
+`python3 -m unittest discover tests` runs only the Python ones.
 
 A GitHub Actions workflow ([.github/workflows/ci.yml](.github/workflows/ci.yml))
-installs `tmux` and `webtorrent-cli`, then runs the whole suite on macOS.
-A lint job runs `shellcheck -x` (sourced libraries included), `node --check`,
-Python compilation plus `ruff` (`E4,E7,E9,F`), and `actionlint`. With `CI=1`,
-a suite that would otherwise skip for a missing dependency fails instead.
+installs `tmux`, `fzf` and `webtorrent-cli`, then runs the whole suite on macOS. A lint
+job runs `shellcheck -x` (sourced libraries included), `node --check`, Python
+compilation plus `ruff` (`E4,E7,E9,F`), and `actionlint`. With `CI=1`, a suite
+that would otherwise skip for a missing dependency fails instead.
 
-## Notes
+The site in `site/` is static HTML, CSS and JS with no build step, deployed by
+[.github/workflows/pages.yml](.github/workflows/pages.yml).
+
+</details>
+
+<details>
+<summary><strong>Notes and troubleshooting</strong></summary>
 
 - Streaming needs a reasonably well-seeded torrent; rare files will stutter.
-- webtorrent-cli 6.x ships webtorrent 2.8.5, which crashes on *every*
-  torrent add when its `uint8-util` dependency resolves to 2.3+ (it passes
-  the info-hash string to an API that now only accepts typed arrays; fixed
-  upstream in webtorrent 3.x). sail checks for this at startup and repairs
-  it in place — `lib/fix-webtorrent.sh` does the same standalone, and
+- webtorrent-cli 6.x ships webtorrent 2.8.5, which crashes on *every* torrent add
+  when its `uint8-util` dependency resolves to 2.3+ (it passes the info-hash
+  string to an API that now only accepts typed arrays; fixed upstream in
+  webtorrent 3.x). sail checks for this at startup and repairs it in place.
+  `lib/fix-webtorrent.sh` does the same standalone, and
   `brew reinstall webtorrent-cli` undoes the patch.
-- Only download content you are legally permitted to obtain.
+
+</details>
+
+## Legal
+
+Only download content you are legally permitted to obtain.
+
+## Links
+
+- [Site](https://rb00t.github.io/sail/)
+- [GitHub](https://github.com/rb00t/sail)
+- [Codeberg mirror](https://codeberg.org/aasif-alam/sail)
+- [MIT licence](LICENSE)
