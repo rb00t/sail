@@ -16,8 +16,7 @@
 </p>
 
 > [!NOTE]
-> **sail was built entirely with AI coding tools.** Every command, helper,
-> test and line of this page came from AI coding agents.
+> **sail was built entirely with AI coding tools.**.
 
 Type a title. Pick a result. It plays.
 
