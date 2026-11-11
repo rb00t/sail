@@ -15,6 +15,10 @@
   <a href="UNLICENSE"><img alt="public domain" src="https://img.shields.io/badge/licence-public%20domain-1f2328?style=flat-square"></a>
 </p>
 
+> [!NOTE]
+> **sail was built entirely with AI coding tools.** Every command, helper,
+> test and line of this page came from AI coding agents.
+
 Type a title. Pick a result. It plays.
 
 sail searches up to thirteen torrent sources at once (six by default), streams
